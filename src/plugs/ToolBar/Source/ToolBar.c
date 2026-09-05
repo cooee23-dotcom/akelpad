@@ -13,7 +13,6 @@
 #include "Resources\Resource.h"
 
 
-/*
 //Include stack functions
 #define StackGetElement
 #define StackInsertAfter
@@ -72,7 +71,6 @@
 #define TranslateAcceleratorWide
 #define UnregisterClassWide
 #include "WideFunc.h"
-//*/
 
 //Include method functions
 #define ALLMETHODFUNC
@@ -93,28 +91,29 @@
 #define STRID_32BIT                           6
 #define STRID_SIDE                            7
 #define STRID_ROWS                            8
-#define STRID_PARSEMSG_UNKNOWNSPECIAL         9
-#define STRID_PARSEMSG_UNKNOWNMETHOD          10
-#define STRID_PARSEMSG_METHODALREADYDEFINED   11
-#define STRID_PARSEMSG_NOMETHOD               12
-#define STRID_PARSEMSG_WRONGPARAMCOUNT        13
-#define STRID_PARSEMSG_NOOPENSET              14
-#define STRID_PARSEMSG_NOCOMMA                15
-#define STRID_PARSEMSG_NOCLOSEPARENTHESIS     16
-#define STRID_PARSEMSG_NOEOL                  17
-#define STRID_IF_NOCOMMA                      18
-#define STRID_IF_NOCLOSEPARENTHESIS           19
-#define STRID_IF_UNKNOWNOPERATOR              20
-#define STRID_IF_UNKNOWNMETHOD                21
-#define STRID_IF_CALLERROR                    22
-#define STRID_IF_NOFALSE                      23
-#define STRID_IF_FOCUSCHANGED                 24
-#define STRID_IF_WRONGPARAMCOUNT              25
-#define STRID_IF_SCRIPTDENIED                 26
-#define STRID_PLUGIN                          27
-#define STRID_OK                              28
-#define STRID_CANCEL                          29
-#define STRID_DEFAULTMENU                     30
+#define STRID_WRAP                            9
+#define STRID_PARSEMSG_UNKNOWNSPECIAL         10
+#define STRID_PARSEMSG_UNKNOWNMETHOD          11
+#define STRID_PARSEMSG_METHODALREADYDEFINED   12
+#define STRID_PARSEMSG_NOMETHOD               13
+#define STRID_PARSEMSG_WRONGPARAMCOUNT        14
+#define STRID_PARSEMSG_NOOPENSET              15
+#define STRID_PARSEMSG_NOCOMMA                16
+#define STRID_PARSEMSG_NOCLOSEPARENTHESIS     17
+#define STRID_PARSEMSG_NOEOL                  18
+#define STRID_IF_NOCOMMA                      19
+#define STRID_IF_NOCLOSEPARENTHESIS           20
+#define STRID_IF_UNKNOWNOPERATOR              21
+#define STRID_IF_UNKNOWNMETHOD                22
+#define STRID_IF_CALLERROR                    23
+#define STRID_IF_NOFALSE                      24
+#define STRID_IF_FOCUSCHANGED                 25
+#define STRID_IF_WRONGPARAMCOUNT              26
+#define STRID_IF_SCRIPTDENIED                 27
+#define STRID_PLUGIN                          28
+#define STRID_OK                              29
+#define STRID_CANCEL                          30
+#define STRID_DEFAULTMENU                     31
 
 #define AKDLL_RECREATE        (WM_USER + 100)
 #define AKDLL_REFRESH         (WM_USER + 101)
@@ -171,9 +170,9 @@
 #define IAO_COPYWHITEASMASK  2 //IDI_ICONARROW2 icon used.
 
 //Icon size
-#define BIS_ICON16          0 //16x16 icons.
-#define BIS_ICON32          1 //32x32 icons.
-#define BIS_ICON24          2 //24x24 icons.
+#define BIS_ICON16          0 //32x32 icons.
+#define BIS_ICON32          1 //48x48 icons.
+#define BIS_ICON24          2 //40x40 icons.
 
 //Grayed icons
 #define GI_SYSTEM          0 //System drawing.
@@ -230,6 +229,7 @@ typedef struct _TOOLBARITEM {
   DWORD dwAction;
   int nTextOffset;
   TBBUTTON tbb;
+  BOOL bBreak;
   int nButtonWidth;
   wchar_t wszButtonItem[MAX_PATH];
   STACKEXTPARAM hParamStack;
@@ -290,6 +290,7 @@ ROWITEM* GetRow(STACKROW *lpRowListStack, int nRow);
 TOOLBARITEM* GetFirstToolbarItemOfNextRow(ROWITEM *lpRowItem);
 void FreeRows(STACKROW *lpRowListStack);
 void FreeToolbarData(STACKTOOLBAR *hStack);
+void SetToolbarSize(STACKTOOLBAR *hStack, int nClientWidth);
 void SetToolbarButtons(STACKTOOLBAR *hStack);
 void ClearToolbarButtons();
 void UpdateToolbar(STACKTOOLBAR *hStack);
@@ -368,9 +369,12 @@ int nIconsBit=32;
 int nGrayedIcons=GI_SYSTEM;
 int nToolbarSide=TBSIDE_TOP;
 int nSidePriority=TSP_TOPBOTTOM;
+BOOL bWrappable=FALSE;
 SIZE sizeToolbar={0};
 SIZE sizeButtons={0};
 SIZE sizeIcon={0};
+int nButtonWidthArror=0;
+int nButtonWidthSep=0;
 CHARRANGE64 crExtSetSel={0};
 UINT_PTR dwPaintTimerId=0;
 BOOL bLockRefresh=FALSE;
@@ -480,6 +484,7 @@ BOOL CALLBACK MainDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
   static HWND hWndSideLabel;
   static HWND hWndRowsLabel;
   static HWND hWndRowsEdit;
+  static HWND hWndWrapCheck;
   static HWND hWndOK;
   static HWND hWndCancel;
   static RESIZEDIALOG rds[]={{&hWndToolBarText,      RDS_SIZE|RDS_X, 0},
@@ -495,6 +500,7 @@ BOOL CALLBACK MainDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
                              {&hWndSideLabel,        RDS_MOVE|RDS_Y, 0},
                              {&hWndRowsLabel,        RDS_MOVE|RDS_Y, 0},
                              {&hWndRowsEdit,         RDS_MOVE|RDS_Y, 0},
+                             {&hWndWrapCheck,        RDS_MOVE|RDS_Y, 0},
                              {&hWndOK,               RDS_MOVE|RDS_X, 0},
                              {&hWndOK,               RDS_MOVE|RDS_Y, 0},
                              {&hWndCancel,           RDS_MOVE|RDS_X, 0},
@@ -516,6 +522,7 @@ BOOL CALLBACK MainDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
     hWndSideLabel=GetDlgItem(hDlg, IDC_SIDE_LABEL);
     hWndRowsLabel=GetDlgItem(hDlg, IDC_ROWS_LABEL);
     hWndRowsEdit=GetDlgItem(hDlg, IDC_ROWS);
+    hWndWrapCheck=GetDlgItem(hDlg, IDC_WRAP);
     hWndOK=GetDlgItem(hDlg, IDOK);
     hWndCancel=GetDlgItem(hDlg, IDCANCEL);
 
@@ -526,6 +533,7 @@ BOOL CALLBACK MainDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
     SetDlgItemTextWide(hDlg, IDC_32BIT, GetLangStringW(wLangModule, STRID_32BIT));
     SetDlgItemTextWide(hDlg, IDC_SIDE_LABEL, GetLangStringW(wLangModule, STRID_SIDE));
     SetDlgItemTextWide(hDlg, IDC_ROWS_LABEL, GetLangStringW(wLangModule, STRID_ROWS));
+    SetDlgItemTextWide(hDlg, IDC_WRAP, GetLangStringW(wLangModule, STRID_WRAP));
     SetDlgItemTextWide(hDlg, IDOK, GetLangStringW(wLangModule, STRID_OK));
     SetDlgItemTextWide(hDlg, IDCANCEL, GetLangStringW(wLangModule, STRID_CANCEL));
 
@@ -555,12 +563,16 @@ BOOL CALLBACK MainDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
       SendMessage(hWndSideBottom, BM_SETCHECK, BST_CHECKED, 0);
 
     SetWindowTextWide(hWndRowsEdit, wszRowList);
+    if (bWrappable)
+      SendMessage(hWndWrapCheck, BM_SETCHECK, BST_CHECKED, 0);
 
     lpOldEditDlgProc=(WNDPROC)GetWindowLongPtrWide(hWndToolBarText, GWLP_WNDPROC);
     SetWindowLongPtrWide(hWndToolBarText, GWLP_WNDPROC, (UINT_PTR)NewEditDlgProc);
 
     SendMessage(hMainWnd, AKD_SETMODELESS, (WPARAM)hDlg, MLA_ADD);
 
+    //Enable/disable horizontal side elements
+    PostMessage(hDlg, WM_COMMAND, IDC_SIDELEFT, 0);
     //Post AKDLL_SELTEXT because dialog size can be changed after AKD_RESIZEDIALOG
     PostMessage(hDlg, AKDLL_SELTEXT, 0, 0);
   }
@@ -590,7 +602,23 @@ BOOL CALLBACK MainDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
   }
   else if (uMsg == WM_COMMAND)
   {
-    if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+    if (LOWORD(wParam) == IDC_SIDELEFT ||
+        LOWORD(wParam) == IDC_SIDETOP ||
+        LOWORD(wParam) == IDC_SIDERIGHT ||
+        LOWORD(wParam) == IDC_SIDEBOTTOM)
+    {
+      BOOL bHorzSide=TRUE;
+
+      if (SendMessage(hWndSideLeft, BM_GETCHECK, 0, 0) == BST_CHECKED ||
+          SendMessage(hWndSideRight, BM_GETCHECK, 0, 0) == BST_CHECKED)
+        bHorzSide=FALSE;
+
+      EnableWindow(hWndRowsLabel, bHorzSide);
+      EnableWindow(hWndRowsEdit, bHorzSide);
+      EnableWindow(hWndWrapCheck, bHorzSide);
+      return TRUE;
+    }
+    else if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
     {
       BOOL bUpdate=FALSE;
 
@@ -653,9 +681,17 @@ BOOL CALLBACK MainDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
           bUpdate=TRUE;
         }
 
+        //Rows
         if (SendMessage(hWndRowsEdit, EM_GETMODIFY, 0, 0))
         {
           GetWindowTextWide(hWndRowsEdit, wszRowList, MAX_PATH);
+          bUpdate=TRUE;
+        }
+
+        //Wrap
+        if (SendMessage(hWndWrapCheck, BM_GETCHECK, 0, 0) != bWrappable)
+        {
+          bWrappable=!bWrappable;
           bUpdate=TRUE;
         }
 
@@ -777,6 +813,7 @@ LRESULT CALLBACK NewMainProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
       if (nToolbarSide == TBSIDE_TOP)
       {
+        if (bWrappable) SetToolbarSize(&hStackToolbar, ns->rcCurrent.right - ns->rcCurrent.left);
         SetWindowPos(hToolbarBG, 0, ns->rcCurrent.left, ns->rcCurrent.top, ns->rcCurrent.right, sizeToolbar.cy, SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOCOPYBITS|SWP_DEFERERASE);
         SetWindowPos(hToolbar, 0, 0, 0, ns->rcCurrent.right, sizeToolbar.cy, SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOCOPYBITS|SWP_DEFERERASE);
         ns->rcCurrent.top+=sizeToolbar.cy;
@@ -784,6 +821,7 @@ LRESULT CALLBACK NewMainProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
       }
       else if (nToolbarSide == TBSIDE_BOTTOM)
       {
+        if (bWrappable) SetToolbarSize(&hStackToolbar, ns->rcCurrent.right - ns->rcCurrent.left);
         SetWindowPos(hToolbarBG, 0, ns->rcCurrent.left, ns->rcCurrent.top + ns->rcCurrent.bottom - sizeToolbar.cy, ns->rcCurrent.right, sizeToolbar.cy, SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOCOPYBITS|SWP_DEFERERASE);
         SetWindowPos(hToolbar, 0, 0, 0, ns->rcCurrent.right, sizeToolbar.cy, SWP_NOZORDER|SWP_NOACTIVATE|SWP_NOCOPYBITS|SWP_DEFERERASE);
         ns->rcCurrent.bottom-=sizeToolbar.cy;
@@ -1088,6 +1126,7 @@ BOOL CreateToolbarWindow()
     bResult=FALSE;
 
   SetToolbarButtons(&hStackToolbar);
+  SetToolbarSize(&hStackToolbar, -1);
   UpdateToolbar(&hStackToolbar);
   return bResult;
 }
@@ -1145,18 +1184,18 @@ BOOL CreateToolbarData(STACKTOOLBAR *hStack, const wchar_t *wpText)
   {
     if (nBigIcons == BIS_ICON32)
     {
-      sizeIcon.cx=32 /*GetSystemMetrics(SM_CXICON)*/;
-      sizeIcon.cy=32 /*GetSystemMetrics(SM_CYICON)*/;
+      sizeIcon.cx=48 /*GetSystemMetrics(SM_CXICON)*/;
+      sizeIcon.cy=48 /*GetSystemMetrics(SM_CYICON)*/;
     }
     else if (nBigIcons == BIS_ICON24)
     {
-      sizeIcon.cx=24;
-      sizeIcon.cy=24;
+      sizeIcon.cx=40;
+      sizeIcon.cy=40;
     }
     else
     {
-      sizeIcon.cx=16 /*GetSystemMetrics(SM_CXSMICON)*/;
-      sizeIcon.cy=16 /*GetSystemMetrics(SM_CYSMICON)*/;
+      sizeIcon.cx=32 /*GetSystemMetrics(SM_CXSMICON)*/;
+      sizeIcon.cy=32 /*GetSystemMetrics(SM_CYSMICON)*/;
     }
     hStack->hImageList=ImageList_Create(sizeIcon.cx, sizeIcon.cy, (nIconsBit == 16?ILC_COLOR16:ILC_COLOR32)|ILC_MASK, 0, 0);
     ImageList_SetBkColor(hStack->hImageList, GetSysColor(COLOR_BTNFACE));
@@ -1412,7 +1451,7 @@ BOOL CreateToolbarData(STACKTOOLBAR *hStack, const wchar_t *wpText)
               lpButton->nTextOffset=(int)(wpLineBegin - wpTextBegin);
 
               lpButton->tbb.iBitmap=-1;
-              lpButton->tbb.idCommand=0;
+              lpButton->tbb.idCommand=++nItemCommand;
               lpButton->tbb.fsState=0;
               lpButton->tbb.fsStyle=TBSTYLE_SEP;
               lpButton->tbb.dwData=0;
@@ -1430,6 +1469,7 @@ BOOL CreateToolbarData(STACKTOOLBAR *hStack, const wchar_t *wpText)
           {
             if (lpLastButton)
             {
+              lpLastButton->bBreak=TRUE;
               lpLastButton->tbb.fsState|=TBSTATE_WRAP;
               if (lpLastButton->tbb.fsStyle & TBSTYLE_SEP)
                 ++hStack->nSepRows;
@@ -1709,9 +1749,15 @@ BOOL CreateToolbarData(STACKTOOLBAR *hStack, const wchar_t *wpText)
   if (hRowListStack.nElements)
   {
     if (lpLastButton)
+    {
+      lpLastButton->bBreak=TRUE;
       lpLastButton->tbb.fsState|=TBSTATE_WRAP;
+    }
     if (hStack->last && hRowListStack.last->lpFirstToolbarItem)
+    {
+      hStack->last->bBreak=FALSE;
       hStack->last->tbb.fsState&=~TBSTATE_WRAP;
+    }
   }
   else
   {
@@ -1892,67 +1938,120 @@ void FreeToolbarData(STACKTOOLBAR *hStack)
 void SetToolbarButtons(STACKTOOLBAR *hStack)
 {
   TOOLBARITEM *lpButton;
-  int nArrorWidth;
-  int nRowWidth;
-  int nMaxRowWidth;
 
-  if (nBigIcons)
-    nArrorWidth=10;
-  else
-    nArrorWidth=9;
   sizeButtons.cx=sizeIcon.cx + 8;
   sizeButtons.cy=sizeIcon.cy + 6;
-  sizeToolbar.cx=sizeIcon.cx + 12;
-  sizeToolbar.cy=sizeIcon.cy + 12;
   SendMessage(hToolbar, TB_SETBITMAPSIZE, 0, MAKELONG(sizeIcon.cx, sizeIcon.cy));
 
-  nMaxRowWidth=sizeButtons.cx;
   SendMessage(hToolbar, TB_SETBUTTONSIZE, 0, MAKELONG(sizeButtons.cx, sizeButtons.cy));
   SendMessage(hToolbar, TB_SETIMAGELIST, 0, (LPARAM)hStack->hImageList);
   SendMessage(hToolbar, TB_SETDISABLEDIMAGELIST, 0, (LPARAM)hStack->hDisabledImageList);
 
   for (lpButton=hStack->first; lpButton; lpButton=lpButton->next)
   {
-    lpButton->nButtonWidth=sizeButtons.cx;
-    if (lpButton->tbb.fsStyle & TBSTYLE_DROPDOWN)
-      lpButton->nButtonWidth+=nArrorWidth;
-    nRowWidth=lpButton->nButtonWidth;
+    if (nToolbarSide == TBSIDE_LEFT || nToolbarSide == TBSIDE_RIGHT)
+      lpButton->tbb.fsState|=TBSTATE_WRAP;
+    SendMessage(hToolbar, TB_ADDBUTTONS, 1, (LPARAM)&lpButton->tbb);
+  }
+}
 
-    ////Calculate vertical row width
-    //if (nToolbarSide == TBSIDE_LEFT || nToolbarSide == TBSIDE_RIGHT)
-    //{
-    //  for (lpTmpButton=lpButton->prev; lpTmpButton; lpTmpButton=lpTmpButton->prev)
-    //  {
-    //    if (lpTmpButton->tbb.fsState & TBSTATE_WRAP)
-    //      break;
-    //    nRowWidth+=lpTmpButton->nButtonWidth;
-    //  }
-    //}
+void SetToolbarSize(STACKTOOLBAR *hStack, int nClientWidth)
+{
+  TOOLBARITEM *lpButton;
+  TOOLBARITEM *lpSepButton=NULL;
+  RECT rc;
+  int nMaxButtonWidth;
+  int nClientEdge=4;
+  int nRowWidth=nClientEdge;
+  BOOL bOnCreate=FALSE;
 
-    if (lpButton->tbb.fsState & TBSTATE_WRAP)
+  if (nClientWidth == -1)
+  {
+    if (bWrappable && (nToolbarSide == TBSIDE_TOP || nToolbarSide == TBSIDE_BOTTOM))
     {
-      if (nToolbarSide == TBSIDE_TOP || nToolbarSide == TBSIDE_BOTTOM)
+      GetClientRect(hMainWnd, &rc);
+      nClientWidth=rc.right;
+    }
+    bOnCreate=TRUE;
+    nButtonWidthSep=0;
+    nButtonWidthArror=0;
+  }
+  sizeButtons.cx=sizeIcon.cx + 8;
+  sizeButtons.cy=sizeIcon.cy + 6;
+  sizeToolbar.cx=sizeIcon.cx + 10;
+  sizeToolbar.cy=sizeIcon.cy + 12;
+
+  nMaxButtonWidth=sizeButtons.cx;
+
+  for (lpButton=hStack->first; lpButton; lpButton=lpButton->next)
+  {
+    if (lpButton->tbb.fsStyle & TBSTYLE_SEP)
+    {
+      if (!nButtonWidthSep)
       {
-        if (lpButton->prev && lpButton->next)
-          sizeToolbar.cy+=sizeButtons.cy + ((lpButton->tbb.fsStyle & TBSTYLE_SEP)?8:0);
+        if (SendMessage(hToolbar, TB_GETITEMRECT, lpButton->tbb.idCommand - 1, (LPARAM)&rc))
+          nButtonWidthSep=rc.right - rc.left;
         else
+          nButtonWidthSep=8;
+      }
+      lpSepButton=lpButton;
+      lpButton->nButtonWidth=nButtonWidthSep;
+    }
+    else
+    {
+      lpButton->nButtonWidth=sizeButtons.cx;
+      if (lpButton->tbb.fsStyle & TBSTYLE_DROPDOWN)
+      {
+        if (!nButtonWidthArror)
         {
-          sizeToolbar.cy+=(lpButton->tbb.fsStyle & TBSTYLE_SEP)?2:0;
-          //First button with TBSTATE_WRAP + TBSTYLE_SEP signal to remove CCS_NODIVIDER
-          //style (already done in CreateToolbarData) and don't add this button.
-          if (!lpButton->prev) continue;
+          if (SendMessage(hToolbar, TB_GETITEMRECT, lpButton->tbb.idCommand - 1, (LPARAM)&rc))
+            nButtonWidthArror=(rc.right - rc.left) - lpButton->nButtonWidth;
+          else
+            nButtonWidthArror=19;
         }
+        lpButton->nButtonWidth+=nButtonWidthArror;
       }
     }
-    else if (nToolbarSide == TBSIDE_LEFT || nToolbarSide == TBSIDE_RIGHT)
-      lpButton->tbb.fsState|=TBSTATE_WRAP;
+    nRowWidth+=lpButton->nButtonWidth;
 
-    nMaxRowWidth=max(nRowWidth, nMaxRowWidth);
-    SendMessage(hToolbar, TB_ADDBUTTONS, 1, (LPARAM)&lpButton->tbb);
+    if (nToolbarSide == TBSIDE_LEFT || nToolbarSide == TBSIDE_RIGHT)
+    {
+      //TBSTATE_WRAP already set in SetToolbarButtons
+      //lpButton->tbb.fsState|=TBSTATE_WRAP;
+      nMaxButtonWidth=max(lpButton->nButtonWidth, nMaxButtonWidth);
+    }
+    else
+    {
+      // (nToolbarSide == TBSIDE_TOP || nToolbarSide == TBSIDE_BOTTOM)
+      if ((DWORD)nRowWidth >= (DWORD)nClientWidth || lpButton->bBreak)
+      {
+        if ((DWORD)nRowWidth >= (DWORD)nClientWidth)
+        {
+          //Break button
+          if (lpSepButton)
+            lpButton=lpSepButton;
+          else if (lpButton->prev)
+            lpButton=lpButton->prev;
+          if (!(lpButton->tbb.fsState & TBSTATE_WRAP))
+          {
+            lpButton->tbb.fsState|=TBSTATE_WRAP;
+            SendMessage(hToolbar, TB_SETSTATE, lpButton->tbb.idCommand, lpButton->tbb.fsState);
+          }
+        }
+        lpSepButton=NULL;
+        nRowWidth=nClientEdge;
+        sizeToolbar.cy+=sizeButtons.cy + ((lpButton->tbb.fsStyle & TBSTYLE_SEP)?8:0);
+      }
+      else if (lpButton->tbb.fsState & TBSTATE_WRAP)
+      {
+        lpButton->tbb.fsState&=~TBSTATE_WRAP;
+        SendMessage(hToolbar, TB_SETSTATE, lpButton->tbb.idCommand, lpButton->tbb.fsState);
+      }
+    }
   }
 
   if (nToolbarSide == TBSIDE_LEFT || nToolbarSide == TBSIDE_RIGHT)
-    sizeToolbar.cx=(sizeToolbar.cx - sizeButtons.cx) + nMaxRowWidth;
+    sizeToolbar.cx=(sizeToolbar.cx - sizeButtons.cx) + nMaxButtonWidth;
 }
 
 void ClearToolbarButtons()
@@ -2970,6 +3069,7 @@ void ReadOptions(DWORD dwFlags)
     WideOption(hOptions, L"SidePriority", PO_DWORD, (LPBYTE)&nSidePriority, sizeof(DWORD));
     WideOption(hOptions, L"ArrowOverlay", PO_DWORD, (LPBYTE)&nArrowOverlay, sizeof(DWORD));
     WideOption(hOptions, L"RowList", PO_STRING, (LPBYTE)wszRowList, MAX_PATH * sizeof(wchar_t));
+    WideOption(hOptions, L"Wrappable", PO_DWORD, (LPBYTE)&bWrappable, sizeof(DWORD));
     WideOption(hOptions, L"WindowRect", PO_BINARY, (LPBYTE)&rcMainCurrentDialog, sizeof(RECT));
 
     SendMessage(hMainWnd, AKD_ENDOPTIONS, (WPARAM)hOptions, 0);
@@ -2998,6 +3098,7 @@ void SaveOptions(DWORD dwFlags)
       WideOption(hOptions, L"ToolbarSide", PO_DWORD, (LPBYTE)&nToolbarSide, sizeof(DWORD));
       WideOption(hOptions, L"SidePriority", PO_DWORD, (LPBYTE)&nSidePriority, sizeof(DWORD));
       WideOption(hOptions, L"ArrowOverlay", PO_DWORD, (LPBYTE)&nArrowOverlay, sizeof(DWORD));
+      WideOption(hOptions, L"Wrappable", PO_DWORD, (LPBYTE)&bWrappable, sizeof(DWORD));
       WideOption(hOptions, L"RowList", PO_STRING, (LPBYTE)wszRowList, ((int)xstrlenW(wszRowList) + 1) * sizeof(wchar_t));
     }
     if (dwFlags & OF_RECT)
@@ -3047,7 +3148,9 @@ const wchar_t* GetLangStringW(LANGID wLangID, int nStringID)
     if (nStringID == STRID_SIDE)
       return L"\x0421\x0442\x043E\x0440\x043E\x043D\x0430";
     if (nStringID == STRID_ROWS)
-      return L"\x0420\x044F\x0434\x044B (1,2...)";
+      return L"\x0420\x044F\x0434\x044B";
+    if (nStringID == STRID_WRAP)
+      return L"\x041F\x0435\x0440\x0435\x043D\x043E\x0441";
     if (nStringID == STRID_PARSEMSG_UNKNOWNSPECIAL)
       return L"\x041D\x0435\x0438\x0437\x0432\x0435\x0441\x0442\x043D\x044B\x0439\x0020\x0441\x043F\x0435\x0446\x0438\x0430\x043B\x044C\x043D\x044B\x0439\x0020\x043F\x0443\x043D\x043A\x0442 \"%s\".";
     if (nStringID == STRID_PARSEMSG_UNKNOWNMETHOD)
@@ -3266,7 +3369,9 @@ SEPARATOR1\r";
     if (nStringID == STRID_SIDE)
       return L"Side";
     if (nStringID == STRID_ROWS)
-      return L"Rows (1,2...)";
+      return L"Rows";
+    if (nStringID == STRID_WRAP)
+      return L"Wrap";
     if (nStringID == STRID_PARSEMSG_UNKNOWNSPECIAL)
       return L"Unknown special item \"%s\".";
     if (nStringID == STRID_PARSEMSG_UNKNOWNMETHOD)
