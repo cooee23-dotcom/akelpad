@@ -69,6 +69,7 @@
 #define IDC_SIDE_LABEL                  1111
 #define IDC_ROWS_LABEL                  1112
 #define IDC_ROWS                        1113
+#define IDC_WRAP                        1114
 #define IDM_SETUP                       1201
 #define IDC_STATIC                      -1
 
@@ -78,7 +79,7 @@
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        11001
 #define _APS_NEXT_COMMAND_VALUE         12001
-#define _APS_NEXT_CONTROL_VALUE         13006
+#define _APS_NEXT_CONTROL_VALUE         13001
 #define _APS_NEXT_SYMED_VALUE           14001
 #endif
 #endif
